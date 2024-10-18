@@ -1,6 +1,6 @@
-
 import functions_framework
 
+import os
 import json
 
 from markupsafe import escape
@@ -8,6 +8,16 @@ from requests import request, auth, Session
 
 # Create a global HTTP session (which provides connection pooling)
 session = Session()
+basic_auth = None
+
+
+def init():
+    global basic_auth
+    basic_auth = auth.HTTPBasicAuth(env_var("API_KEY"), env_var("API_SECRET"))
+
+
+def env_var(name):
+    return os.environ[name]
 
 @functions_framework.http
 def hello_http(request):
@@ -33,7 +43,6 @@ def hello_http(request):
     endpoint = "anything"
     url = f"https://httpbin.org/{endpoint}"
     payload = {"message": message}
-    basic_auth = auth.HTTPBasicAuth("my_key", "my_secret")
     resp = session.request(
         "POST",
         url,
@@ -52,3 +61,6 @@ def hello_http(request):
     else:
         print(f"Bad response: {resp}")
         return "that didn't work"
+
+
+init()

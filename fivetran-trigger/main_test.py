@@ -1,6 +1,7 @@
+import os
+
 import flask
 import pytest
-import requests
 import responses
 
 import main
@@ -17,6 +18,8 @@ def test_http_hello(app):
   responses.add(
     responses.POST, "https://httpbin.org/anything", json={"data": "{\"message\":\"Hello World\"}"}, status=200
   )
+  os.environ["API_KEY"] = "my_key"
+  os.environ["API_SECRET"] = "my_secret"
   with app.test_request_context():
     main.hello_http(flask.request)
 

@@ -17,6 +17,8 @@ Initial Setup
  * `pip3 install -r requirements.txt`
 
 Run locally with [functions-framework-python](https://github.com/GoogleCloudPlatform/functions-framework-python)
+ * read .env.example
+ * set up required env vars, eg `export API_KEY=my_key`
  * run `functions-framework-python --target hello_http --debug` (hello_http is an example)
  * in another shell, run `http http://localhost:8080/`
 
