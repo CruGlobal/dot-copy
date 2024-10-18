@@ -17,4 +17,9 @@ Initial Setup
  * `pip3 install -r requirements.txt`
 
 Run locally with [functions-framework-python](https://github.com/GoogleCloudPlatform/functions-framework-python)
- * `functions-framework-python --target hello_http --debug` (hello_http is an example)
+ * run `functions-framework-python --target hello_http --debug` (hello_http is an example)
+ * in another shell, run `http http://localhost:8080/`
+
+Run unit tests with pytest:
+ * `pip3 install -r requirements-test.txt`
+ * `pytest`
