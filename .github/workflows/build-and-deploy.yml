@@ -3,33 +3,85 @@ name: Build and Deploy Cloud Run Job
 on:
   push:
     branches:
+      - poc
       - dev
 
+# TODO: can these be non-secret?
+# ## Secrets:
+#    - `GCP_PROJECT_ID`: Your Google Cloud project ID. ?
+#    - `GCP_REGION`: The region where your Cloud Run job is deployed. ?
+#    - `WORKLOAD_IDENTITY_PROVIDER`: the GCP IAM workload identity pool provider name for GHA for the POC env
+#    - `SERVICE_ACCOUNT`: the GCP service account that GHA will control and which deploys new function revisions
+
+
+env:
+  # TODO: generalize for more functions
+  FUNCTION_NAME: fivetran-trigger
+
 jobs:
-  build:
+  build-and-deploy:
+
+    # TODO: update
+    # ## Explanation:
+    #
+    #1. **Checkout code**: Uses the `actions/checkout` action to check out the repository code.
+    #2. **Set up Cloud SDK**: Uses the `google-github-actions/setup-gcloud` action to set up the Google Cloud SDK with the provided project ID and service account key.
+    #3. **Configure Docker**: Configures Docker to use the Google Cloud credentials.
+    #4. **Build Docker image**: Builds the Docker image from the Dockerfile in the repository.
+    #5. **Push Docker image**: Pushes the built Docker image to Google Container Registry.
+    #6. **Deploy to Cloud Run Job**: Updates the Cloud Run job with the new Docker image.
+
+    # Add "id-token" with the intended permissions.
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.FUNCTION_NAME }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+      - id: 'auth'
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+#          service_account: ${{ secrets.SERVICE_ACCOUNT }}
 
-      - name: Configure Docker
-        run: gcloud auth configure-docker
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-      - name: Build Docker image
-        run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-image-name:latest .
-
-      - name: Push Docker image
-        run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-image-name:latest
-
-      - name: Deploy to Cloud Run Job
+      - name: Deploy to Cloud Run Functions
+        id: deploy
         run: |
-          gcloud run jobs update your-job-name \
-            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-image-name:latest \
-            --region ${{ secrets.GCP_REGION }}
+          gcloud functions deploy ${{ env.FUNCTION_NAME }} \
+            --region ${{ secrets.GCP_REGION }} \
+            --gen2 \
+            --source=. \
+            --runtime=python312 \
+            --entry-point=hello_http
+
+      - uses: actions/github-script@v6 # TODO: check version
+        if: github.event.pull_request.merged == true
+        with:
+          script: |
+            const output = `#### GCF Deploy ⚙️\`${{ steps.deploy.outcome }}\`
+            <details><summary>Show Deploy</summary>
+            \`\`\`\n
+            ${{ steps.deploy.outputs.stdout }}
+            \`\`\`
+            </details>
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ env.FUNCTION_NAME }}\`, Workflow: \`${{ github.workflow }}\`*`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
