@@ -25,3 +25,10 @@ Run locally with [functions-framework-python](https://github.com/GoogleCloudPlat
 Run unit tests with pytest:
  * `pip3 install -r requirements-test.txt`
  * `pytest`
+
+
+Deploy new secrets:
+
+`echo -n "123shhhhh456" | gcloud secrets versions add fivetran-trigger_API_SECRET --data-file=-`
+
+
