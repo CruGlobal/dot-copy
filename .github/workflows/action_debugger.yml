@@ -1,3 +1,4 @@
+name: debug-oidc-claims
 on:
   workflow_dispatch:
 
