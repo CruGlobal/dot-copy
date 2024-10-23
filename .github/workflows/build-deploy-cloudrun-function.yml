@@ -1,0 +1,80 @@
+name: Build and Deploy Cloud Run Function
+
+# Trigger the workflow on push events to the main branch
+on:
+  push:
+    branches:
+      - $default-branch
+      - staging
+  workflow_dispatch:
+    # Allows manual build and deploy of any branch/ref
+    inputs:
+      auto-deploy:
+        type: boolean
+        description: Deploy image after building?
+        required: true
+        default: 'false'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    # Set permissions for the job
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+
+    steps:
+      # Step 1: Checkout the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Authenticate to Google Cloud
+      - id: 'auth'
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: '${{ GITHUB_REPOSITORY##*/ }}-github-sa@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+
+
+      # Step 3: Set up the Google Cloud SDK
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Step 4: Deploy the Cloud Function using gcloud
+      - name: Deploy to Cloud Run Functions
+        id: deploy
+        run: |
+          gcloud functions deploy ${{ inputs.function_name }} \
+            --region ${{ secrets.GCP_REGION }} \
+            --gen2 \
+            --source=. \
+            --runtime=python312 \
+            --entry-point=hello_http
+
+      # Step 5: Post a comment on the pull request if it is merged
+      - uses: actions/github-script@v6
+        if: github.event.pull_request.merged == true
+        with:
+          script: |
+            const output = `#### GCF Deploy ⚙️\`${{ steps.deploy.outcome }}\`
+            <details><summary>Show Deploy</summary>
+            \`\`\`\n
+            ${{ steps.deploy.outputs.stdout }}
+            \`\`\`
+            </details>
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ inputs.function_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+
+# Define the input parameter for the function name
+inputs:
+  function_name:
+    description: 'The name of the Cloud Function to deploy'
+    required: true
